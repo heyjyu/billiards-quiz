@@ -321,7 +321,7 @@ function getS(id) {
 // Canvas renderer
 // ══════════════════════════════════════════
 const CANVAS_W = 700, CANVAS_H = 384;
-const BALL_R = 13.5; // approximate ball radius in canvas pixels
+const BALL_R = 9; // ball radius matching billiard-bible scale
 
 const IMGS = {
   white: document.getElementById('img-white'),
@@ -438,14 +438,13 @@ function drawBall(ctx, img, x, y, r) {
   }
 }
 
-function drawTrajectory(ctx, positions, color = 'rgba(255,255,255,0.85)', dash = []) {
+function drawTrajectory(ctx, positions) {
   if (positions.length < 2) return;
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  if (dash.length) ctx.setLineDash(dash);
   ctx.beginPath();
   ctx.moveTo(positions[0].x, positions[0].y);
   for (let i = 1; i < positions.length; i++) {
@@ -453,24 +452,6 @@ function drawTrajectory(ctx, positions, color = 'rgba(255,255,255,0.85)', dash =
   }
   ctx.stroke();
   ctx.restore();
-
-  // Arrow at end
-  if (positions.length >= 2) {
-    const last = positions[positions.length - 1];
-    const prev = positions[positions.length - 2];
-    const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-    ctx.save();
-    ctx.fillStyle = color;
-    ctx.translate(last.x, last.y);
-    ctx.rotate(angle);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-10, -5);
-    ctx.lineTo(-10, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
 }
 
 function renderShot(shot, showLine) {
@@ -483,14 +464,9 @@ function renderShot(shot, showLine) {
   const yellow0 = getInitPos(shot.yellow);
   const red0 = getInitPos(shot.red);
 
-  if (showLine) {
-    // Draw trajectory BEHIND balls
-    if (shot.white.length > 1)
-      drawTrajectory(ctx, shot.white, 'rgba(255,255,255,0.9)');
-    if (shot.yellow.length > 1)
-      drawTrajectory(ctx, shot.yellow, 'rgba(255,210,0,0.7)', [4, 4]);
-    if (shot.red.length > 1)
-      drawTrajectory(ctx, shot.red, 'rgba(255,80,80,0.7)', [4, 4]);
+  if (showLine && shot.white.length > 1) {
+    // 수구(흰 공) 이동선만 표시
+    drawTrajectory(ctx, shot.white);
   }
 
   if (white0)  drawBall(ctx, IMGS.white,  white0.x,  white0.y,  BALL_R);
