@@ -321,7 +321,37 @@ function getS(id) {
 // Canvas renderer
 // ══════════════════════════════════════════
 const CANVAS_W = 700, CANVAS_H = 384;
-const BALL_R = 9; // ball radius matching billiard-bible scale
+// billiard-bible: tableInsideRect={x:27,y:27,width:500,height:250}, contentWidget=700
+// Internal coords: x∈[0,500], y∈[0,250]  →  canvas: offset 27px each side
+const OX = 27, OY = 27, PW = 500, PH = 250;
+const SX = (CANVAS_W - OX * 2) / PW;   // 1.292
+const SY = (CANVAS_H - OY * 2) / PH;   // 1.32
+const BALL_R = Math.round(4.8 * 1.2 * SX * 0.88);  // ~7px
+
+// rotation value → flip flags (billiard-bible STEP system)
+// Determined by rotation quadrant: 0-89°=STEP0, 90-179°=STEP3, 180-269°=STEP2, 270-359°=STEP1
+// rotation stored in tenths of degree
+function getFlipFlags(rotation) {
+  const deg = (rotation / 10) % 360;
+  if (deg < 90)  return { fx: false, fy: false }; // STEP_0
+  if (deg < 180) return { fx: false, fy: true  }; // STEP_3: flip Y
+  if (deg < 270) return { fx: true,  fy: true  }; // STEP_2: flip both
+  return            { fx: true,  fy: false };       // STEP_1: flip X
+}
+
+function applyFlip(x, y, fx, fy) {
+  return { x: fx ? PW - x : x, y: fy ? PH - y : y };
+}
+
+function toCanvas(x, y) {
+  return { x: OX + x * SX, y: OY + y * SY };
+}
+
+function transformPos(rawX, rawY, rotation) {
+  const { fx, fy } = getFlipFlags(rotation);
+  const { x, y } = applyFlip(rawX, rawY, fx, fy);
+  return toCanvas(x, y);
+}
 
 const IMGS = {
   white: document.getElementById('img-white'),
@@ -337,64 +367,52 @@ Object.values(IMGS).forEach(img => {
 });
 
 function drawTable(ctx) {
-  // Black rail
+  // Play area bounds in canvas coords (from billiard-bible tableInsideRect scaled)
+  const px = OX, py = OY, pw = PW * SX, ph = PH * SY;
+
+  // Black rail background
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-  // Rail border highlight
-  ctx.strokeStyle = '#333';
+  ctx.strokeStyle = '#2a2a2a';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, CANVAS_W - 1, CANVAS_H - 1);
 
-  const rail = 22;
-
   // Blue felt
   ctx.fillStyle = '#2a5298';
-  ctx.fillRect(rail, rail, CANVAS_W - rail*2, CANVAS_H - rail*2);
+  ctx.fillRect(px, py, pw, ph);
 
-  // Felt grid (dashed lines — like billiard-bible)
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  // Dashed grid lines (4×3 like billiard-bible)
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
-  ctx.setLineDash([4, 6]);
-  const playW = CANVAS_W - rail*2, playH = CANVAS_H - rail*2;
-  // Vertical lines (divide into ~4 columns)
+  ctx.setLineDash([4, 7]);
   for (let i = 1; i < 4; i++) {
-    const x = rail + (playW / 4) * i;
-    ctx.beginPath(); ctx.moveTo(x, rail); ctx.lineTo(x, CANVAS_H - rail); ctx.stroke();
+    const x = px + pw / 4 * i;
+    ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x, py + ph); ctx.stroke();
   }
-  // Horizontal lines (divide into ~3 rows)
   for (let i = 1; i < 3; i++) {
-    const y = rail + (playH / 3) * i;
-    ctx.beginPath(); ctx.moveTo(rail, y); ctx.lineTo(CANVAS_W - rail, y); ctx.stroke();
+    const y = py + ph / 3 * i;
+    ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px + pw, y); ctx.stroke();
   }
   ctx.setLineDash([]);
 
-  // Diamond dots on rails — 3 between each corner per long side, 1 per short side
-  ctx.fillStyle = '#fff';
-  const dotR = 3;
-  const longCount = 3, shortCount = 1;
-
-  // Top & bottom rail diamonds (long sides)
-  for (let i = 0; i <= longCount + 1; i++) {
-    const x = rail + (playW / (longCount + 1)) * i;
-    if (i > 0 && i <= longCount) {
-      ctx.beginPath(); ctx.arc(x, rail / 2, dotR, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x, CANVAS_H - rail / 2, dotR, 0, Math.PI*2); ctx.fill();
-    }
-  }
-  // Left & right rail diamonds (short sides)
-  for (let i = 1; i <= shortCount + 1; i++) {
-    const y = rail + (playH / (shortCount + 1)) * i;
-    if (i <= shortCount + 1 && i > 0 && i < shortCount + 2) {
-      ctx.beginPath(); ctx.arc(rail / 2, y, dotR, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(CANVAS_W - rail / 2, y, dotR, 0, Math.PI*2); ctx.fill();
-    }
-  }
-
-  // Cushion inner edge
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  // Cushion edge line
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(rail, rail, playW, playH);
+  ctx.strokeRect(px, py, pw, ph);
+
+  // Diamond dots — 3 long-side diamonds per half, 1 short-side per half
+  ctx.fillStyle = '#fff';
+  const dotR = 2.5;
+  // Long side (top/bottom): at 1/4, 1/2, 3/4 of play width
+  [1,2,3].forEach(i => {
+    const x = px + pw / 4 * i;
+    ctx.beginPath(); ctx.arc(x, py / 2, dotR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, py + ph + py / 2, dotR, 0, Math.PI*2); ctx.fill();
+  });
+  // Short side (left/right): at 1/2 of play height
+  const ym = py + ph / 2;
+  ctx.beginPath(); ctx.arc(px / 2, ym, dotR, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px + pw + px / 2, ym, dotR, 0, Math.PI*2); ctx.fill();
 }
 
 function parsePosStr(pos) {
@@ -438,17 +456,21 @@ function drawBall(ctx, img, x, y, r) {
   }
 }
 
-function drawTrajectory(ctx, positions) {
+function drawTrajectory(ctx, positions, rotation) {
   if (positions.length < 2) return;
+  const { fx, fy } = getFlipFlags(rotation);
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.85)';
   ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(positions[0].x, positions[0].y);
+  const flip = (px, py) => { const f = applyFlip(px, py, fx, fy); return toCanvas(f.x, f.y); };
+  const p0 = flip(positions[0].x, positions[0].y);
+  ctx.moveTo(p0.x, p0.y);
   for (let i = 1; i < positions.length; i++) {
-    ctx.lineTo(positions[i].x, positions[i].y);
+    const p = flip(positions[i].x, positions[i].y);
+    ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
   ctx.restore();
@@ -460,18 +482,20 @@ function renderShot(shot, showLine) {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawTable(ctx);
 
-  const white0 = getInitPos(shot.white);
-  const yellow0 = getInitPos(shot.yellow);
-  const red0 = getInitPos(shot.red);
+  const rot = shot.rotation || 0;
+  const raw0 = pos => (pos.find(p => p.frame === 0) || pos[0]);
+
+  const w0 = shot.white.length  ? raw0(shot.white)  : null;
+  const y0 = shot.yellow.length ? raw0(shot.yellow) : null;
+  const r0 = shot.red.length    ? raw0(shot.red)    : null;
 
   if (showLine && shot.white.length > 1) {
-    // 수구(흰 공) 이동선만 표시
-    drawTrajectory(ctx, shot.white);
+    drawTrajectory(ctx, shot.white, rot);
   }
 
-  if (white0)  drawBall(ctx, IMGS.white,  white0.x,  white0.y,  BALL_R);
-  if (yellow0) drawBall(ctx, IMGS.yellow, yellow0.x, yellow0.y, BALL_R);
-  if (red0)    drawBall(ctx, IMGS.red,    red0.x,    red0.y,    BALL_R);
+  if (w0) { const c = transformPos(w0.x, w0.y, rot); drawBall(ctx, IMGS.white,  c.x, c.y, BALL_R); }
+  if (y0) { const c = transformPos(y0.x, y0.y, rot); drawBall(ctx, IMGS.yellow, c.x, c.y, BALL_R); }
+  if (r0) { const c = transformPos(r0.x, r0.y, rot); drawBall(ctx, IMGS.red,    c.x, c.y, BALL_R); }
 }
 
 // Thumbnail for list view (smaller canvas)
@@ -483,18 +507,21 @@ function renderThumb(shot, canvas) {
   ctx.scale(scaleX, scaleY);
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawTable(ctx);
-  const drawSmallBall = (img, pos) => {
-    if (!pos) return;
+  const rot = shot.rotation || 0;
+  const drawSmallBall = (img, raw) => {
+    if (!raw) return;
+    const c = transformPos(raw.x, raw.y, rot);
     const r = BALL_R * 0.9;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
+    ctx.arc(c.x, c.y, r, 0, Math.PI*2);
     ctx.fillStyle = img === IMGS.white ? '#f0f0f0' : img === IMGS.yellow ? '#f5c842' : '#e03030';
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
   };
-  drawSmallBall(IMGS.white,  getInitPos(shot.white));
-  drawSmallBall(IMGS.yellow, getInitPos(shot.yellow));
-  drawSmallBall(IMGS.red,    getInitPos(shot.red));
+  const raw0 = pos => pos.find(p => p.frame === 0) || pos[0];
+  drawSmallBall(IMGS.white,  shot.white.length  ? raw0(shot.white)  : null);
+  drawSmallBall(IMGS.yellow, shot.yellow.length ? raw0(shot.yellow) : null);
+  drawSmallBall(IMGS.red,    shot.red.length    ? raw0(shot.red)    : null);
   ctx.restore();
 }
 
