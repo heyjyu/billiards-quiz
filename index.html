@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>당구 초이스 학습</title>
+<style>
+:root {
+  --bg: #0f1117; --s1: #1a1d27; --s2: #252836; --border: #2e3148;
+  --text: #e8eaf0; --dim: #8b8fa8; --accent: #5b7cf6; --green: #4caf7d;
+  --yellow: #f5a623; --red: #e05252; --purple: #9c6fe4;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Noto Sans KR', sans-serif; min-height: 100vh; }
+
+/* ── Password screen ── */
+#pw-screen {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 9999;
+}
+#pw-screen h1 { font-size: 1.6rem; }
+#pw-screen p { color: var(--dim); font-size: 0.9rem; }
+#pw-input {
+  padding: 12px 20px; width: 260px; border-radius: 10px;
+  border: 2px solid var(--border); background: var(--s1); color: var(--text);
+  font-size: 1rem; text-align: center; letter-spacing: 4px;
+  outline: none; transition: border-color .2s;
+}
+#pw-input:focus { border-color: var(--accent); }
+#pw-input.shake { animation: shake .3s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+#pw-btn {
+  padding: 12px 32px; border-radius: 10px; background: var(--accent);
+  border: none; color: #fff; font-size: 1rem; cursor: pointer; font-weight: 600;
+}
+
+/* ── App (hidden until auth) ── */
+#app { display: none; flex-direction: column; height: 100vh; }
+
+/* Header */
+header {
+  display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+header h1 { font-size: 0.95rem; font-weight: 600; flex: 1; }
+.hstat { font-size: 0.75rem; color: var(--dim); }
+.hstat span { color: var(--accent); font-weight: 600; }
+
+/* Nav tabs */
+.tabs {
+  display: flex; gap: 6px; padding: 10px 20px;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab {
+  padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--dim); font-size: 0.82rem; cursor: pointer;
+  white-space: nowrap; transition: all .15s;
+}
+.tab:hover { color: var(--text); border-color: var(--accent); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Main content area */
+main { flex: 1; overflow-y: auto; }
+
+/* ── Study view ── */
+#study-view { display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 14px; }
+
+/* Progress bar */
+.prog-wrap { width: 100%; max-width: 700px; display: flex; align-items: center; gap: 10px; }
+.prog-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+.prog-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+.prog-label { font-size: 0.75rem; color: var(--dim); min-width: 60px; text-align: right; }
+
+/* Shot card */
+.shot-card {
+  width: 100%; max-width: 700px;
+  background: var(--s1); border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden;
+}
+.shot-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+}
+.shot-id { font-size: 0.75rem; color: var(--dim); }
+.shot-cats { display: flex; gap: 5px; }
+.cat-tag {
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--s2); font-size: 0.7rem; color: var(--dim);
+}
+.shot-actions { display: flex; gap: 8px; }
+.icon-btn {
+  background: none; border: none; cursor: pointer; font-size: 1.1rem;
+  padding: 4px; border-radius: 6px; transition: background .15s;
+}
+.icon-btn:hover { background: var(--s2); }
+.icon-btn.active { filter: none; }
+
+/* Canvas container */
+.canvas-wrap {
+  position: relative; background: #1a3a1a; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 200px;
+}
+.canvas-wrap canvas { display: block; max-width: 100%; }
+.reveal-hint {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.6); color: var(--dim); font-size: 0.72rem;
+  padding: 5px 14px; border-radius: 20px; pointer-events: none;
+  transition: opacity .3s;
+}
+.canvas-wrap.revealed .reveal-hint { opacity: 0; }
+
+/* Answer panel (shown after reveal) */
+.answer-panel {
+  padding: 14px 16px; border-top: 1px solid var(--border);
+  display: none; flex-direction: column; gap: 10px;
+}
+.answer-panel.visible { display: flex; }
+.ans-label { font-size: 0.7rem; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.ans-desc { font-size: 0.9rem; font-weight: 600; }
+.ans-tip { font-size: 0.82rem; line-height: 1.7; color: var(--dim); white-space: pre-wrap; }
+.ans-meta { display: flex; gap: 16px; flex-wrap: wrap; }
+.meta-item { font-size: 0.75rem; color: var(--dim); }
+.meta-item strong { color: var(--text); }
+.yt-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px; background: #ff0000;
+  color: #fff; font-size: 0.8rem; text-decoration: none; font-weight: 600;
+  align-self: flex-start;
+}
+
+/* Review buttons */
+.review-btns {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  padding: 0 16px 14px;
+  display: none;
+}
+.review-btns.visible { display: grid; }
+.rbtn {
+  padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--s1); color: var(--text); font-size: 0.78rem; cursor: pointer;
+  text-align: center; transition: all .15s; line-height: 1.3;
+}
+#rbtn-again { border-color: var(--red); color: var(--red); }
+#rbtn-again:hover { background: rgba(224,82,82,.1); }
+#rbtn-hard { border-color: var(--yellow); color: var(--yellow); }
+#rbtn-hard:hover { background: rgba(245,166,35,.1); }
+#rbtn-good { border-color: var(--green); color: var(--green); }
+#rbtn-good:hover { background: rgba(76,175,125,.12); }
+#rbtn-easy { border-color: var(--accent); color: var(--accent); }
+#rbtn-easy:hover { background: rgba(91,124,246,.12); }
+
+/* Nav buttons */
+.nav-btns { display: flex; gap: 10px; width: 100%; max-width: 700px; }
+.nav-btn {
+  flex: 1; padding: 11px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--s1);
+  color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all .15s;
+}
+.nav-btn:hover:not(:disabled) { border-color: var(--accent); }
+.nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* Done screen */
+#done-screen {
+  display: none; flex-direction: column; align-items: center; gap: 14px;
+  padding: 60px 20px; text-align: center;
+}
+#done-screen.visible { display: flex; }
+#done-screen h2 { font-size: 1.3rem; }
+#done-screen p { color: var(--dim); font-size: 0.9rem; }
+
+/* ── List view ── */
+#list-view { display: none; padding: 16px; }
+.list-controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.search-input {
+  flex: 1; min-width: 160px; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--s2); color: var(--text); font-size: 0.85rem;
+}
+.filter-btn {
+  padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--s2); color: var(--dim); font-size: 0.8rem; cursor: pointer;
+}
+.filter-btn.active { border-color: var(--accent); color: var(--accent); }
+.shot-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+}
+.grid-card {
+  background: var(--s1); border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; cursor: pointer; transition: border-color .15s;
+}
+.grid-card:hover { border-color: var(--accent); }
+.grid-card canvas { width: 100%; display: block; }
+.grid-card-meta { padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
+.gc-id { font-size: 0.72rem; color: var(--dim); }
+.gc-status { font-size: 0.8rem; }
+
+/* Keyboard hint */
+.kbd-hint { font-size: 0.72rem; color: var(--dim); text-align: center; }
+.kbd-hint kbd {
+  display: inline-block; padding: 1px 5px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--s2); font-size: 0.7rem;
+}
+</style>
+</head>
+<body>
+
+<!-- Password screen -->
+<div id="pw-screen">
+  <div style="font-size:2.5rem">🎱</div>
+  <h1>당구 초이스 학습</h1>
+  <p>비밀번호를 입력하세요</p>
+  <input id="pw-input" type="password" placeholder="••••••" autocomplete="off">
+  <button id="pw-btn" onclick="checkPw()">입장</button>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <header>
+    <h1>🎱 당구 초이스</h1>
+    <div class="hstat">완료 <span id="h-done">0</span></div>
+    <div class="hstat">즐겨찾기 <span id="h-fav">0</span></div>
+    <div class="hstat">전체 <span id="h-total">0</span></div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setView('study')">📖 학습</button>
+    <button class="tab" onclick="setView('review')">🔄 복습</button>
+    <button class="tab" onclick="setView('favorites')">⭐ 즐겨찾기</button>
+    <button class="tab" onclick="setView('list')">📋 목록</button>
+  </div>
+
+  <main>
+    <!-- Study view -->
+    <div id="study-view">
+      <div class="prog-wrap">
+        <div class="prog-bar-bg"><div class="prog-bar" id="prog-bar"></div></div>
+        <div class="prog-label" id="prog-label">0 / 0</div>
+      </div>
+
+      <div class="shot-card" id="shot-card">
+        <div class="shot-card-header">
+          <span class="shot-id" id="s-id">#0</span>
+          <div class="shot-cats" id="s-cats"></div>
+          <div class="shot-actions">
+            <button class="icon-btn" id="btn-fav" onclick="toggleFav()" title="즐겨찾기">☆</button>
+            <button class="icon-btn" id="btn-done" onclick="toggleDone()" title="학습완료">○</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvas-wrap" onclick="reveal()">
+          <canvas id="shot-canvas" width="700" height="384"></canvas>
+          <div class="reveal-hint">클릭해서 정답(수구 이동선) 확인</div>
+        </div>
+        <div class="answer-panel" id="answer-panel">
+          <div>
+            <div class="ans-label">배치 설명</div>
+            <div class="ans-desc" id="ans-desc"></div>
+          </div>
+          <div>
+            <div class="ans-label">치는 방법 (팁)</div>
+            <div class="ans-tip" id="ans-tip"></div>
+          </div>
+          <div class="ans-meta">
+            <div class="meta-item">두께 <strong id="ans-thick"></strong></div>
+            <div class="meta-item">레일 스피드 <strong id="ans-rail"></strong></div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a id="ans-yt" href="#" target="_blank" class="yt-link" style="display:none">▶ 영상 보기</a>
+          </div>
+        </div>
+        <div class="review-btns" id="review-btns">
+          <button class="rbtn" id="rbtn-again" onclick="rate(0)">😵 다시<br><small>5분</small></button>
+          <button class="rbtn" id="rbtn-hard" onclick="rate(1)">😓 어려움<br><small>1일</small></button>
+          <button class="rbtn" id="rbtn-good" onclick="rate(2)">😊 알겠음<br><small>3일</small></button>
+          <button class="rbtn" id="rbtn-easy" onclick="rate(3)">😄 쉬움<br><small>7일</small></button>
+        </div>
+      </div>
+
+      <div class="nav-btns">
+        <button class="nav-btn" id="btn-prev" onclick="go(-1)">← 이전</button>
+        <button class="nav-btn" id="btn-next" onclick="go(1)">다음 →</button>
+      </div>
+
+      <div class="kbd-hint">
+        <kbd>Space</kbd> 정답 확인 &nbsp;
+        <kbd>←</kbd><kbd>→</kbd> 이전/다음 &nbsp;
+        <kbd>1</kbd>-<kbd>4</kbd> 평가
+      </div>
+
+      <div id="done-screen">
+        <div style="font-size:3rem">🎱</div>
+        <h2 id="done-title">완료!</h2>
+        <p id="done-msg"></p>
+        <button class="nav-btn" style="max-width:200px" onclick="resetQueue()">처음부터</button>
+      </div>
+    </div>
+
+    <!-- List view -->
+    <div id="list-view">
+      <div class="list-controls">
+        <input class="search-input" id="list-search" placeholder="설명 검색..." oninput="renderList()">
+        <button class="filter-btn" id="f-all" onclick="setListFilter('all')">전체</button>
+        <button class="filter-btn" id="f-undone" onclick="setListFilter('undone')">미완료</button>
+        <button class="filter-btn" id="f-done" onclick="setListFilter('done')">완료</button>
+        <button class="filter-btn" id="f-fav" onclick="setListFilter('fav')">⭐ 즐겨찾기</button>
+      </div>
+      <div class="shot-grid" id="shot-grid"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Ball image cache -->
+<div style="display:none">
+  <img id="img-white" src="https://billiard-bible.com/assets/images/white_ball.webp" crossorigin="anonymous">
+  <img id="img-yellow" src="https://billiard-bible.com/assets/images/yellow_ball.webp" crossorigin="anonymous">
+  <img id="img-red" src="https://billiard-bible.com/assets/images/red_ball.webp" crossorigin="anonymous">
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// Password
+// ══════════════════════════════════════════
+const PW_HASH = '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b'; // sha256 of '1'
+// Change PW_HASH to sha256 of your password. Default: '1'
+
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkPw() {
+  const val = document.getElementById('pw-input').value;
+  const hash = await sha256(val);
+  if (hash === PW_HASH) {
+    sessionStorage.setItem('auth', '1');
+    document.getElementById('pw-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    init();
+  } else {
+    const inp = document.getElementById('pw-input');
+    inp.classList.add('shake');
+    inp.value = '';
+    setTimeout(() => inp.classList.remove('shake'), 400);
+  }
+}
+document.getElementById('pw-input').addEventListener('keydown', e => { if(e.key==='Enter') checkPw(); });
+
+// Auto-login if already authed in this session
+if (sessionStorage.getItem('auth') === '1') {
+  document.getElementById('pw-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.addEventListener('DOMContentLoaded', init);
+}
+
+// ══════════════════════════════════════════
+// State
+// ══════════════════════════════════════════
+let shots = [];          // all shot data
+let queue = [];          // current study queue (shot indices)
+let qIdx = 0;            // position in queue
+let revealed = false;
+let viewMode = 'study';  // 'study'|'review'|'favorites'|'list'
+let listFilter = 'all';
+
+// Per-shot state (persisted in localStorage)
+// state[id] = { fav: bool, done: bool, srs: {interval,ease,due,reps,lapses} }
+let state = {};
+
+const SRS_INTERVALS = [5/1440, 1, 3, 7]; // days
+
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem('bb_state') || '{}'); } catch { state = {}; }
+}
+function saveState() {
+  localStorage.setItem('bb_state', JSON.stringify(state));
+}
+function getS(id) {
+  if (!state[id]) state[id] = { fav: false, done: false, srs: { interval:0, ease:2.5, due:0, reps:0, lapses:0 } };
+  return state[id];
+}
+
+// ══════════════════════════════════════════
+// Canvas renderer
+// ══════════════════════════════════════════
+const CANVAS_W = 700, CANVAS_H = 384;
+const BALL_R = 13.5; // approximate ball radius in canvas pixels
+
+const IMGS = {
+  white: document.getElementById('img-white'),
+  yellow: document.getElementById('img-yellow'),
+  red: document.getElementById('img-red'),
+};
+
+// Wait for images to load
+let imgsLoaded = 0;
+Object.values(IMGS).forEach(img => {
+  if (img.complete) { imgsLoaded++; }
+  else img.onload = () => { imgsLoaded++; };
+});
+
+function drawTable(ctx) {
+  // Black rail
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Rail border highlight
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, CANVAS_W - 1, CANVAS_H - 1);
+
+  const rail = 22;
+
+  // Blue felt
+  ctx.fillStyle = '#2a5298';
+  ctx.fillRect(rail, rail, CANVAS_W - rail*2, CANVAS_H - rail*2);
+
+  // Felt grid (dashed lines — like billiard-bible)
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  const playW = CANVAS_W - rail*2, playH = CANVAS_H - rail*2;
+  // Vertical lines (divide into ~4 columns)
+  for (let i = 1; i < 4; i++) {
+    const x = rail + (playW / 4) * i;
+    ctx.beginPath(); ctx.moveTo(x, rail); ctx.lineTo(x, CANVAS_H - rail); ctx.stroke();
+  }
+  // Horizontal lines (divide into ~3 rows)
+  for (let i = 1; i < 3; i++) {
+    const y = rail + (playH / 3) * i;
+    ctx.beginPath(); ctx.moveTo(rail, y); ctx.lineTo(CANVAS_W - rail, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Diamond dots on rails — 3 between each corner per long side, 1 per short side
+  ctx.fillStyle = '#fff';
+  const dotR = 3;
+  const longCount = 3, shortCount = 1;
+
+  // Top & bottom rail diamonds (long sides)
+  for (let i = 0; i <= longCount + 1; i++) {
+    const x = rail + (playW / (longCount + 1)) * i;
+    if (i > 0 && i <= longCount) {
+      ctx.beginPath(); ctx.arc(x, rail / 2, dotR, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, CANVAS_H - rail / 2, dotR, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  // Left & right rail diamonds (short sides)
+  for (let i = 1; i <= shortCount + 1; i++) {
+    const y = rail + (playH / (shortCount + 1)) * i;
+    if (i <= shortCount + 1 && i > 0 && i < shortCount + 2) {
+      ctx.beginPath(); ctx.arc(rail / 2, y, dotR, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(CANVAS_W - rail / 2, y, dotR, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // Cushion inner edge
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(rail, rail, playW, playH);
+}
+
+function parsePosStr(pos) {
+  // pos is already parsed into [{frame, x, y}] array
+  return pos;
+}
+
+function getInitPos(positions) {
+  // Frame 0 position
+  const p = positions.find(p => p.frame === 0) || positions[0];
+  return p ? { x: p.x, y: p.y } : null;
+}
+
+function drawBall(ctx, img, x, y, r) {
+  if (!x && !y) return;
+  try {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+    ctx.restore();
+    // Shadow
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  } catch(e) {
+    try { ctx.restore(); } catch {}  // unwind pending save/clip
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = img === IMGS.white ? '#f0f0f0' : img === IMGS.yellow ? '#f5c842' : '#e03030';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function drawTrajectory(ctx, positions, color = 'rgba(255,255,255,0.85)', dash = []) {
+  if (positions.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (dash.length) ctx.setLineDash(dash);
+  ctx.beginPath();
+  ctx.moveTo(positions[0].x, positions[0].y);
+  for (let i = 1; i < positions.length; i++) {
+    ctx.lineTo(positions[i].x, positions[i].y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Arrow at end
+  if (positions.length >= 2) {
+    const last = positions[positions.length - 1];
+    const prev = positions[positions.length - 2];
+    const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.translate(last.x, last.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-10, -5);
+    ctx.lineTo(-10, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function renderShot(shot, showLine) {
+  const canvas = document.getElementById('shot-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  drawTable(ctx);
+
+  const white0 = getInitPos(shot.white);
+  const yellow0 = getInitPos(shot.yellow);
+  const red0 = getInitPos(shot.red);
+
+  if (showLine) {
+    // Draw trajectory BEHIND balls
+    if (shot.white.length > 1)
+      drawTrajectory(ctx, shot.white, 'rgba(255,255,255,0.9)');
+    if (shot.yellow.length > 1)
+      drawTrajectory(ctx, shot.yellow, 'rgba(255,210,0,0.7)', [4, 4]);
+    if (shot.red.length > 1)
+      drawTrajectory(ctx, shot.red, 'rgba(255,80,80,0.7)', [4, 4]);
+  }
+
+  if (white0)  drawBall(ctx, IMGS.white,  white0.x,  white0.y,  BALL_R);
+  if (yellow0) drawBall(ctx, IMGS.yellow, yellow0.x, yellow0.y, BALL_R);
+  if (red0)    drawBall(ctx, IMGS.red,    red0.x,    red0.y,    BALL_R);
+}
+
+// Thumbnail for list view (smaller canvas)
+function renderThumb(shot, canvas) {
+  const ctx = canvas.getContext('2d');
+  const scaleX = canvas.width / CANVAS_W;
+  const scaleY = canvas.height / CANVAS_H;
+  ctx.save();
+  ctx.scale(scaleX, scaleY);
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  drawTable(ctx);
+  const drawSmallBall = (img, pos) => {
+    if (!pos) return;
+    const r = BALL_R * 0.9;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
+    ctx.fillStyle = img === IMGS.white ? '#f0f0f0' : img === IMGS.yellow ? '#f5c842' : '#e03030';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
+  };
+  drawSmallBall(IMGS.white,  getInitPos(shot.white));
+  drawSmallBall(IMGS.yellow, getInitPos(shot.yellow));
+  drawSmallBall(IMGS.red,    getInitPos(shot.red));
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════
+// Queue & navigation
+// ══════════════════════════════════════════
+function buildQueue(mode) {
+  const now = Date.now() / 86400000;
+  let indices = shots.map((_, i) => i);
+
+  if (mode === 'review') {
+    indices = indices.filter(i => {
+      const s = getS(shots[i].id).srs;
+      return s.reps > 0 && s.due <= now + 0.1;
+    });
+  } else if (mode === 'favorites') {
+    indices = indices.filter(i => getS(shots[i].id).fav);
+  }
+  // study mode: all shots, undone first
+  if (mode === 'study') {
+    indices.sort((a, b) => {
+      const da = getS(shots[a].id).done ? 1 : 0;
+      const db = getS(shots[b].id).done ? 1 : 0;
+      return da - db;
+    });
+  }
+  return indices;
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['study','review','favorites','list'][i] === mode);
+  });
+
+  document.getElementById('study-view').style.display = (mode !== 'list') ? 'flex' : 'none';
+  document.getElementById('list-view').style.display = (mode === 'list') ? 'block' : 'none';
+
+  if (mode === 'list') {
+    renderList();
+    return;
+  }
+
+  queue = buildQueue(mode);
+  qIdx = 0;
+  showShot();
+}
+
+function showShot() {
+  const doneScreen = document.getElementById('done-screen');
+  const shotCard = document.getElementById('shot-card');
+
+  if (queue.length === 0 || qIdx >= queue.length) {
+    shotCard.style.display = 'none';
+    doneScreen.classList.add('visible');
+    document.getElementById('done-title').textContent =
+      viewMode === 'review' ? '오늘 복습 완료!' : '전체 학습 완료!';
+    document.getElementById('done-msg').textContent =
+      `${queue.length}개 완료`;
+    return;
+  }
+
+  shotCard.style.display = 'block';
+  doneScreen.classList.remove('visible');
+
+  const shot = shots[queue[qIdx]];
+  const s = getS(shot.id);
+  revealed = false;
+
+  // Header
+  document.getElementById('s-id').textContent = `#${shot.id}`;
+  const catsEl = document.getElementById('s-cats');
+  catsEl.innerHTML = (shot.categories || []).map(c => `<span class="cat-tag">${c}</span>`).join('');
+
+  // Fav / done buttons
+  document.getElementById('btn-fav').textContent = s.fav ? '⭐' : '☆';
+  document.getElementById('btn-done').textContent = s.done ? '✅' : '○';
+
+  // Canvas (no line)
+  document.getElementById('canvas-wrap').classList.remove('revealed');
+  document.getElementById('answer-panel').classList.remove('visible');
+  document.getElementById('review-btns').classList.remove('visible');
+  renderShot(shot, false);
+
+  // Answer content (hidden)
+  document.getElementById('ans-desc').textContent = shot.description || '';
+  document.getElementById('ans-tip').textContent = shot.tip || '';
+  document.getElementById('ans-thick').textContent = shot.ball_thickness ? `${shot.ball_thickness}/5` : '-';
+  document.getElementById('ans-rail').textContent = shot.rail_speed ? `${shot.rail_speed}/5` : '-';
+  const ytLink = document.getElementById('ans-yt');
+  if (shot.youtube_id) {
+    const ytId = shot.youtube_id.split('?')[0];
+    const ts = shot.youtube_id.match(/t=(\d+)/)?.[1];
+    ytLink.href = `https://www.youtube.com/watch?v=${ytId}${ts ? '&t=' + ts : ''}`;
+    ytLink.style.display = 'flex';
+  } else {
+    ytLink.style.display = 'none';
+  }
+
+  // Progress
+  const pct = queue.length ? Math.round((qIdx / queue.length) * 100) : 0;
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = `${qIdx + 1} / ${queue.length}`;
+
+  // Nav buttons
+  document.getElementById('btn-prev').disabled = qIdx === 0;
+  document.getElementById('btn-next').disabled = qIdx >= queue.length - 1;
+
+  updateStats();
+}
+
+function reveal() {
+  if (revealed) return;
+  revealed = true;
+  document.getElementById('canvas-wrap').classList.add('revealed');
+  renderShot(shots[queue[qIdx]], true);
+  document.getElementById('answer-panel').classList.add('visible');
+  document.getElementById('review-btns').classList.add('visible');
+}
+
+function go(dir) {
+  qIdx = Math.max(0, Math.min(queue.length - 1, qIdx + dir));
+  showShot();
+}
+
+function resetQueue() {
+  queue = buildQueue(viewMode);
+  qIdx = 0;
+  showShot();
+}
+
+function rate(rating) {
+  const shot = shots[queue[qIdx]];
+  const s = getS(shot.id);
+  const now = Date.now() / 86400000;
+  s.srs.reps++;
+  if (rating === 0) {
+    s.srs.lapses++;
+    s.srs.interval = SRS_INTERVALS[0];
+  } else {
+    s.srs.interval = SRS_INTERVALS[rating];
+    s.srs.ease = Math.max(1.3, s.srs.ease + [-.15, -.1, 0, .1][rating]);
+  }
+  s.srs.due = now + s.srs.interval;
+  saveState();
+  if (qIdx < queue.length - 1) go(1);
+  else showShot();
+}
+
+// ══════════════════════════════════════════
+// Fav / Done toggles
+// ══════════════════════════════════════════
+function toggleFav() {
+  if (!shots.length || !queue.length) return;
+  const shot = shots[queue[qIdx]];
+  const s = getS(shot.id);
+  s.fav = !s.fav;
+  saveState();
+  document.getElementById('btn-fav').textContent = s.fav ? '⭐' : '☆';
+  updateStats();
+}
+
+function toggleDone() {
+  if (!shots.length || !queue.length) return;
+  const shot = shots[queue[qIdx]];
+  const s = getS(shot.id);
+  s.done = !s.done;
+  saveState();
+  document.getElementById('btn-done').textContent = s.done ? '✅' : '○';
+  updateStats();
+}
+
+function updateStats() {
+  const done = shots.filter(s => getS(s.id).done).length;
+  const fav = shots.filter(s => getS(s.id).fav).length;
+  document.getElementById('h-done').textContent = done;
+  document.getElementById('h-fav').textContent = fav;
+  document.getElementById('h-total').textContent = shots.length;
+}
+
+// ══════════════════════════════════════════
+// List view
+// ══════════════════════════════════════════
+let listFilter2 = 'all';
+function setListFilter(f) {
+  listFilter2 = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('f-' + f).classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const search = document.getElementById('list-search').value.toLowerCase();
+  const grid = document.getElementById('shot-grid');
+  grid.innerHTML = '';
+
+  const filtered = shots.filter((shot, i) => {
+    const s = getS(shot.id);
+    if (listFilter2 === 'done' && !s.done) return false;
+    if (listFilter2 === 'undone' && s.done) return false;
+    if (listFilter2 === 'fav' && !s.fav) return false;
+    if (search && !shot.description.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filtered.forEach((shot, i) => {
+    const s = getS(shot.id);
+    const card = document.createElement('div');
+    card.className = 'grid-card';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 200; canvas.height = 110;
+    canvas.style.cssText = 'width:100%;aspect-ratio:200/110;display:block;';
+
+    const meta = document.createElement('div');
+    meta.className = 'grid-card-meta';
+    meta.innerHTML = `<span class="gc-id">#${shot.id}</span><span class="gc-status">${s.fav?'⭐':''}${s.done?'✅':''}</span>`;
+
+    card.appendChild(canvas);
+    card.appendChild(meta);
+    card.onclick = () => {
+      setView('study');
+      const shotIdx = shots.findIndex(s => s.id === shot.id);
+      queue = buildQueue('study');
+      qIdx = Math.max(0, queue.findIndex(qi => qi === shotIdx));
+      showShot();
+    };
+    grid.appendChild(card);
+
+    // Render thumb after append (for visibility)
+    setTimeout(() => renderThumb(shot, canvas), 0);
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<p style="color:var(--dim);padding:20px">해당하는 샷이 없어요</p>';
+  }
+}
+
+// ══════════════════════════════════════════
+// Keyboard shortcuts
+// ══════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (document.getElementById('pw-screen').style.display !== 'none') return;
+  if (e.target.tagName === 'INPUT') return;
+  switch(e.key) {
+    case ' ': case 'f': e.preventDefault(); reveal(); break;
+    case 'ArrowRight': case 'n': go(1); break;
+    case 'ArrowLeft':  case 'p': go(-1); break;
+    case '1': if(revealed) rate(0); break;
+    case '2': if(revealed) rate(1); break;
+    case '3': if(revealed) rate(2); break;
+    case '4': if(revealed) rate(3); break;
+  }
+});
+
+// ══════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════
+async function init() {
+  loadState();
+  try {
+    const r = await fetch('data/billiard_bible_shots.json');
+    shots = await r.json();
+    queue = buildQueue('study');
+    updateStats();
+    showShot();
+  } catch(e) {
+    document.getElementById('study-view').innerHTML = `
+      <div style="text-align:center;padding:60px 20px;color:var(--dim);">
+        <div style="font-size:3rem;margin-bottom:16px">📭</div>
+        <h2 style="margin-bottom:8px;color:var(--text)">샷 데이터가 없어요</h2>
+        <p>터미널에서 실행하세요:</p>
+        <pre style="background:var(--s2);padding:12px;border-radius:8px;margin-top:12px;font-size:.8rem;text-align:left;display:inline-block">python3 scrape_billiard_bible.py [shot-id ...]</pre>
+      </div>`;
+  }
+
+  // Check if auth was set before DOMContentLoaded
+  if (sessionStorage.getItem('auth') === '1') {
+    document.getElementById('pw-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  }
+}
+
+// Init if already authenticated
+if (sessionStorage.getItem('auth') === '1') {
+  window.addEventListener('load', init);
+}
+</script>
+</body>
+</html>
