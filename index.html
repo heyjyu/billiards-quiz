@@ -13,26 +13,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Noto Sans KR', sans-serif; min-height: 100vh; }
 
-/* ── Password screen ── */
-#pw-screen {
-  position: fixed; inset: 0; background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 9999;
-}
-#pw-screen h1 { font-size: 1.6rem; }
-#pw-screen p { color: var(--dim); font-size: 0.9rem; }
-#pw-input {
-  padding: 12px 20px; width: 260px; border-radius: 10px;
-  border: 2px solid var(--border); background: var(--s1); color: var(--text);
-  font-size: 1rem; text-align: center; letter-spacing: 4px;
-  outline: none; transition: border-color .2s;
-}
-#pw-input:focus { border-color: var(--accent); }
-#pw-input.shake { animation: shake .3s; }
-@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
-#pw-btn {
-  padding: 12px 32px; border-radius: 10px; background: var(--accent);
-  border: none; color: #fff; font-size: 1rem; cursor: pointer; font-weight: 600;
-}
 
 /* ── App (hidden until auth) ── */
 #app { display: none; flex-direction: column; height: 100vh; }
@@ -206,17 +186,8 @@ main { flex: 1; overflow-y: auto; }
 </head>
 <body>
 
-<!-- Password screen -->
-<div id="pw-screen">
-  <div style="font-size:2.5rem">🎱</div>
-  <h1>당구 초이스 학습</h1>
-  <p>비밀번호를 입력하세요</p>
-  <input id="pw-input" type="password" placeholder="••••••" autocomplete="off">
-  <button id="pw-btn" onclick="checkPw()">입장</button>
-</div>
-
 <!-- Main app -->
-<div id="app">
+<div id="app" style="display:flex">
   <header>
     <h1>🎱 당구 초이스</h1>
     <div class="hstat">완료 <span id="h-done">0</span></div>
@@ -318,40 +289,6 @@ main { flex: 1; overflow-y: auto; }
 </div>
 
 <script>
-// ══════════════════════════════════════════
-// Password
-// ══════════════════════════════════════════
-const PW_HASH = '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b'; // sha256 of '1'
-// Change PW_HASH to sha256 of your password. Default: '1'
-
-async function sha256(msg) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
-async function checkPw() {
-  const val = document.getElementById('pw-input').value;
-  const hash = await sha256(val);
-  if (hash === PW_HASH) {
-    sessionStorage.setItem('auth', '1');
-    document.getElementById('pw-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    init();
-  } else {
-    const inp = document.getElementById('pw-input');
-    inp.classList.add('shake');
-    inp.value = '';
-    setTimeout(() => inp.classList.remove('shake'), 400);
-  }
-}
-document.getElementById('pw-input').addEventListener('keydown', e => { if(e.key==='Enter') checkPw(); });
-
-// Auto-login if already authed in this session
-if (sessionStorage.getItem('auth') === '1') {
-  document.getElementById('pw-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.addEventListener('DOMContentLoaded', init);
-}
 
 // ══════════════════════════════════════════
 // State
@@ -824,7 +761,6 @@ function renderList() {
 // Keyboard shortcuts
 // ══════════════════════════════════════════
 document.addEventListener('keydown', e => {
-  if (document.getElementById('pw-screen').style.display !== 'none') return;
   if (e.target.tagName === 'INPUT') return;
   switch(e.key) {
     case ' ': case 'f': e.preventDefault(); reveal(); break;
@@ -858,17 +794,9 @@ async function init() {
       </div>`;
   }
 
-  // Check if auth was set before DOMContentLoaded
-  if (sessionStorage.getItem('auth') === '1') {
-    document.getElementById('pw-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-  }
 }
 
-// Init if already authenticated
-if (sessionStorage.getItem('auth') === '1') {
-  window.addEventListener('load', init);
-}
+window.addEventListener('load', init);
 </script>
 </body>
 </html>
