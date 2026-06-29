@@ -312,6 +312,12 @@ function loadState() {
 function saveState() {
   localStorage.setItem('bb_state', JSON.stringify(state));
 }
+function saveLastShotId(id) {
+  localStorage.setItem('bb_last_shot', String(id));
+}
+function loadLastShotId() {
+  return parseInt(localStorage.getItem('bb_last_shot') || '0', 10) || 0;
+}
 function getS(id) {
   if (!state[id]) state[id] = { fav: false, done: false, srs: { interval:0, ease:2.5, due:0, reps:0, lapses:0 } };
   return state[id];
@@ -590,6 +596,7 @@ function showShot() {
   const shot = shots[queue[qIdx]];
   const s = getS(shot.id);
   revealed = false;
+  saveLastShotId(shot.id);
 
   // Header
   document.getElementById('s-id').textContent = `#${shot.id}`;
@@ -786,6 +793,11 @@ async function init() {
     shots = await r.json();
     queue = buildQueue('study');
     updateStats();
+    const lastId = loadLastShotId();
+    if (lastId) {
+      const idx = queue.findIndex(qi => shots[qi].id === lastId);
+      if (idx >= 0) qIdx = idx;
+    }
     showShot();
   } catch(e) {
     document.getElementById('study-view').innerHTML = `
