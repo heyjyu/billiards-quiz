@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>당구 초이스 학습</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="당구학습">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root {
   --bg: #0f1117; --s1: #1a1d27; --s2: #252836; --border: #2e3148;
@@ -819,6 +826,10 @@ async function init() {
 }
 
 window.addEventListener('load', init);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
