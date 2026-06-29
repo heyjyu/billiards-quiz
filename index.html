@@ -571,8 +571,15 @@ function setView(mode) {
     return;
   }
 
+  const prevShotId = queue.length ? shots[queue[qIdx]]?.id : 0;
   queue = buildQueue(mode);
-  qIdx = 0;
+  // Restore position: find the same shot in the new queue, or stay at 0
+  if (prevShotId) {
+    const idx = queue.findIndex(qi => shots[qi].id === prevShotId);
+    qIdx = idx >= 0 ? idx : 0;
+  } else {
+    qIdx = 0;
+  }
   showShot();
 }
 
