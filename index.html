@@ -304,6 +304,7 @@ let shots = [];          // all shot data
 let queue = [];          // current study queue (shot indices)
 let qIdx = 0;            // position in queue
 let revealed = false;
+let savedPos = {};       // saved shot id per mode (study/review/favorites)
 let viewMode = 'study';  // 'study'|'review'|'favorites'|'list'
 let listFilter = 'all';
 
@@ -578,11 +579,15 @@ function setView(mode) {
     return;
   }
 
-  const prevShotId = queue.length ? shots[queue[qIdx]]?.id : 0;
+  // Save current position before switching
+  if (queue.length && viewMode) {
+    savedPos[viewMode] = shots[queue[qIdx]]?.id || 0;
+  }
   queue = buildQueue(mode);
-  // Restore position: find the same shot in the new queue, or stay at 0
-  if (prevShotId) {
-    const idx = queue.findIndex(qi => shots[qi].id === prevShotId);
+  // Restore saved position for this mode
+  const savedId = savedPos[mode] || 0;
+  if (savedId) {
+    const idx = queue.findIndex(qi => shots[qi].id === savedId);
     qIdx = idx >= 0 ? idx : 0;
   } else {
     qIdx = 0;
